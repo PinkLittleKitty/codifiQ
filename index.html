@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Arquitectura Q Decoder</title>
+</head>
+<body>
+    <h1>Arquitectura Q Decoder</h1>
+    <label for="lineCount">Número de celdas de 16 bits:</label>
+    <input type="number" id="lineCount" min="1" max="10" value="1">
+    <button onclick="generateInputFields()">Generar</button>
+    <div id="inputFieldsContainer">
+    </div>
+    <button onclick="decode()">Decodificar</button>
+    <h2>Salida:</h2>
+    <pre id="output"></pre>
+
+    <script>
+        let currentLineCount = 1;
+
+        function generateInputFields() {
+            const lineCountInput = document.getElementById("lineCount");
+            const newLineCount = parseInt(lineCountInput.value, 10);
+
+            if (newLineCount >= 1 && newLineCount <= 10) {
+                currentLineCount = newLineCount;
+                const inputFieldsContainer = document.getElementById("inputFieldsContainer");
+                inputFieldsContainer.innerHTML = "";
+
+                for (let i = 0; i < currentLineCount; i++) {
+                    const lineDiv = document.createElement("div");
+                    lineDiv.id = `binaryInputLine${i}`;
+
+                    for (let j = 0; j < 16; j++) {
+                        const binaryDigitInput = document.createElement("input");
+                        binaryDigitInput.type = "text";
+                        binaryDigitInput.classList.add("binary-digit");
+                        binaryDigitInput.maxLength = 1;
+                        binaryDigitInput.size = 1;
+
+                        binaryDigitInput.addEventListener("input", function () {
+                            if (this.value && this.nextElementSibling) {
+                                this.nextElementSibling.focus();
+                            }
+                        });
+
+                        lineDiv.appendChild(binaryDigitInput);
+                    }
+
+                    inputFieldsContainer.appendChild(lineDiv);
+                }
+            }
+        }
+
+        function decode() {
+            const decodedInstructions = [];
+            const valuesFromLines = new Map();
+
+            for (let i = 0; i < currentLineCount; i++) {
+                const binaryDigitsArray = Array.from(document.querySelectorAll(`#binaryInputLine${i} .binary-digit`));
+                const binaryInput = binaryDigitsArray.map(input => input.value).join('');
+
+                if (binaryInput.length !== 16 || !/^[01]+$/.test(binaryInput)) {
+                    decodedInstructions.push("Entrada binaria inválida");
+                } else {
+                    const opCode = binaryInput.substring(0, 4);
+                    const modeDest = binaryInput.substring(4, 10);
+                    const modeSrc = binaryInput.substring(10, 16);
+                    let decodedInstruction = "";
+
+                    // Decodificar instrucción
+                    switch (opCode) {
+                        case '0000':
+                            decodedInstruction = "MUL";
+                            break;
+                        case '0001':
+                            decodedInstruction = "MOV";
+                            break;
+                        case '0010':
+                            decodedInstruction = "ADD";
+                            break;
+                        case '0011':
+                            decodedInstruction = "SUB";
+                            break;
+                        default:
+                            decodedInstruction = "Instrucción Inválida";
+                            break;
+                    }
+
+                    const destinationMode = decodeMode(modeDest, i + 1, valuesFromLines);
+                    const sourceMode = decodeMode(modeSrc, i + 1, valuesFromLines);
+
+                    // Excluir "Modo Inválido" o valores vacíos
+                    if (destinationMode && destinationMode !== "Modo Inválido") {
+                        decodedInstruction += ` ${destinationMode}`;
+                    }
+                    if (sourceMode && sourceMode !== "Modo Inválido") {
+                        decodedInstruction += `, ${sourceMode}`;
+                    }
+
+                    decodedInstructions.push(decodedInstruction);
+                }
+            }
+
+            document.getElementById('output').textContent = decodedInstructions.join('\n');
+        }
+
+        function decodeMode(modeBits, currentLine, valuesFromLines) {
+            const modePrefix = modeBits.substring(0, 3);
+            const modeValue = parseInt(modeBits.substring(3), 2);
+
+            if (modePrefix === '000' || modePrefix === '001' || modePrefix === '011') {
+                // Para "Inmediato," "Directo," y "Indirecto", checkear la línea debajo
+                const lineBelow = currentLine < currentLineCount ? currentLine + 1 : currentLine;
+                const binaryDigitsArrayBelow = Array.from(document.querySelectorAll(`#binaryInputLine${lineBelow - 1} .binary-digit`));
+                const binaryInputBelow = binaryDigitsArrayBelow.map(input => input.value).join('');
+
+                if (valuesFromLines.has(lineBelow)) {
+                    return valuesFromLines.get(lineBelow);
+                } else {
+                    const valueBelow = parseInt(binaryInputBelow, 2);
+                    const hexValue = `0x${valueBelow.toString(16).toUpperCase().padStart(4, '0')}`;
+                    valuesFromLines.set(lineBelow, hexValue);
+                    return hexValue;
+                }
+            }
+
+            if (modePrefix === '100' || modePrefix === '110') {
+                if (modeValue < currentLine) {
+                    return "R" + modeValue;
+                } else {
+                    return "Modo Inválido";
+                }
+            }
+
+            return "Modo Inválido";
+        }
+    </script>
+</body>
+</html>
